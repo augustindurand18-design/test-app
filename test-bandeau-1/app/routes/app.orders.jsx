@@ -1,40 +1,44 @@
 import { useLoaderData, Link } from "react-router";
-import { authenticate } from "../shopify.server";
 import { Page, Card, DataTable, Text } from "@shopify/polaris";
 
-export const loader = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
-
-  // On récupère les 10 dernières commandes via l’Admin GraphQL
-  const response = await admin.graphql(
-    `#graphql
-      query LastOrders {
-        orders(first: 10, sortKey: CREATED_AT, reverse: true) {
-          edges {
-            node {
-              id
-              name
-              processedAt
-              totalPriceSet {
-                shopMoney {
-                  amount
-                  currencyCode
-                }
-              }
-              customer {
-                displayName
-                email
-              }
-            }
-          }
-        }
-      }
-    `
-  );
-
-  const json = await response.json();
-
-  const orders = json.data.orders.edges.map((edge) => edge.node);
+// ⚠️ VERSION TRAINING SANS API SHOPIFY
+export const loader = async () => {
+  // On simule 3 commandes
+  const orders = [
+    {
+      id: "1001",
+      name: "#1001",
+      processedAt: new Date().toISOString(),
+      totalPriceSet: {
+        shopMoney: { amount: "59.90", currencyCode: "EUR" },
+      },
+      customer: {
+        displayName: "Jean Test",
+        email: "jean.test@example.com",
+      },
+    },
+    {
+      id: "1002",
+      name: "#1002",
+      processedAt: new Date().toISOString(),
+      totalPriceSet: {
+        shopMoney: { amount: "19.90", currencyCode: "EUR" },
+      },
+      customer: {
+        displayName: "Marie Exemple",
+        email: "marie@example.com",
+      },
+    },
+    {
+      id: "1003",
+      name: "#1003",
+      processedAt: new Date().toISOString(),
+      totalPriceSet: {
+        shopMoney: { amount: "120.00", currencyCode: "EUR" },
+      },
+      customer: null,
+    },
+  ];
 
   return { orders };
 };
@@ -44,12 +48,12 @@ export default function OrdersIndex() {
 
   const rows = orders.map((order) => {
     const money = order.totalPriceSet.shopMoney;
-    const orderId = order.id.split("/").pop(); // on extrait l’ID “nu”
+    const orderId = order.id; // déjà simple
 
     return [
       order.name,
       order.customer?.displayName || "—",
-      new Date(order.processedAt).toLocaleString(),
+      new Date(order.processedAt).toLocaleString("fr-FR"),
       `${money.amount} ${money.currencyCode}`,
       <Link to={`/app/orders/${orderId}`}>Voir facture</Link>,
     ];

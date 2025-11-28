@@ -1,80 +1,65 @@
 import { useLoaderData } from "react-router";
 import { Page, Card, Text, Divider } from "@shopify/polaris";
-import { authenticate } from "../shopify.server";
 
-export const loader = async ({ request, params }) => {
-  const { admin } = await authenticate.admin(request);
+// ⚠️ VERSION TRAINING SANS API SHOPIFY
+export const loader = async ({ params }) => {
   const { id } = params;
 
-  const globalId = `gid://shopify/Order/${id}`;
-
-  const response = await admin.graphql(
-    `#graphql
-      query OrderForInvoice($id: ID!) {
-        order(id: $id) {
-          id
-          name
-          processedAt
-          currencyCode
-          customer {
-            displayName
-            email
-          }
-          shippingAddress {
-            name
-            address1
-            address2
-            zip
-            city
-            country
-          }
-          lineItems(first: 50) {
-            edges {
-              node {
-                id
-                name
-                quantity
-                originalUnitPriceSet {
-                  shopMoney {
-                    amount
-                    currencyCode
-                  }
-                }
-              }
-            }
-          }
-          subtotalPriceSet {
-            shopMoney {
-              amount
-              currencyCode
-            }
-          }
-          totalShippingPriceSet {
-            shopMoney {
-              amount
-              currencyCode
-            }
-          }
-          totalTaxSet {
-            shopMoney {
-              amount
-              currencyCode
-            }
-          }
-          totalPriceSet {
-            shopMoney {
-              amount
-              currencyCode
-            }
-          }
-        }
-      }
-    `,
-    { variables: { id: globalId } },
-  );
-
-  const json = await response.json();
-  const order = json.data.order;
+  // On génère une fausse commande à partir de l'id
+  const order = {
+    id,
+    name: `#${id}`,
+    processedAt: new Date().toISOString(),
+    customer: {
+      displayName: "Client de test",
+      email: "client@test.com",
+    },
+    shippingAddress: {
+      name: "Client de test",
+      address1: "12 rue de la Boutique",
+      address2: "",
+      zip: "75001",
+      city: "Paris",
+      country: "France",
+    },
+    lineItems: {
+      edges: [
+        {
+          node: {
+            id: "line-1",
+            name: "Produit A",
+            quantity: 2,
+            originalUnitPriceSet: {
+              shopMoney: { amount: "19.90", currencyCode: "EUR" },
+            },
+          },
+        },
+        {
+          node: {
+            id: "line-2",
+            name: "Produit B",
+            quantity: 1,
+            originalUnitPriceSet: {
+              shopMoney: { amount: "39.90", currencyCode: "EUR" },
+            },
+          },
+        },
+      ],
+    },
+    subtotalPriceSet: {
+      shopMoney: { amount: "79.70", currencyCode: "EUR" },
+    },
+    totalShippingPriceSet: {
+      shopMoney: { amount: "5.00", currencyCode: "EUR" },
+    },
+    totalTaxSet: {
+      shopMoney: { amount: "0.00", currencyCode: "EUR" },
+    },
+    totalPriceSet: {
+      shopMoney: { amount: "84.70", currencyCode: "EUR" },
+    },
+    totalPriceSetShopMoneyCurrencyCode: "EUR",
+  };
 
   return { order };
 };
@@ -92,7 +77,7 @@ export default function OrderInvoice() {
     );
   }
 
-  const currency = order.totalPriceSet.shopMoney.currencyCode;
+  const currency = "EUR";
   const lineItems = order.lineItems.edges.map((edge) => edge.node);
 
   const formatMoney = (amount) =>
@@ -119,9 +104,7 @@ export default function OrderInvoice() {
         </Text>
         <Text as="p">Facture : {order.name}</Text>
         <Text as="p">
-          Date :{" "}
-          {order.processedAt &&
-            new Date(order.processedAt).toLocaleString("fr-FR")}
+          Date : {new Date(order.processedAt).toLocaleString("fr-FR")}
         </Text>
       </Card>
 
@@ -242,7 +225,9 @@ export default function OrderInvoice() {
           </Text>
           <Text as="p">
             Livraison :{" "}
-            {formatMoney(order.totalShippingPriceSet.shopMoney.amount)}
+            {formatMoney(
+              order.totalShippingPriceSet.shopMoney.amount,
+            )}
           </Text>
           <Text as="p">
             Taxes : {formatMoney(order.totalTaxSet.shopMoney.amount)}
