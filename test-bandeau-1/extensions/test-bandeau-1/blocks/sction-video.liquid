@@ -1,0 +1,329 @@
+<section
+  class="app-hero-video"
+  style="
+    height: {{ block.settings.hero_height }}vh;
+    background-color: {{ block.settings.background_color }};
+  "
+>
+  <div class="app-hero-video__media-wrapper">
+    {% if block.settings.video_file != blank %}
+      {%- comment -%} 🎥 Vidéo uploadée depuis l'éditeur de thème {%- endcomment -%}
+      <div class="app-hero-video__media app-hero-video__media--file">
+        {{ block.settings.video_file | video_tag:
+          autoplay: true,
+          loop: block.settings.loop,
+          muted: true,
+          controls: false,
+          playsinline: true,
+          class: 'app-hero-video__video'
+        }}
+      </div>
+    {% elsif block.settings.video_url != blank %}
+      {%- comment -%} 🎥 Fallback YouTube {%- endcomment -%}
+      <div class="app-hero-video__media app-hero-video__media--youtube">
+        <iframe
+          src="{{ block.settings.video_url | replace: 'watch?v=', 'embed/' }}?autoplay=1&mute=1&loop=1&playlist={{ block.settings.video_url | split: 'v=' | last }}"
+          frameborder="0"
+          allow="autoplay; encrypted-media"
+          allowfullscreen
+        ></iframe>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="app-hero-video__overlay">
+    <header class="app-hero-video__header">
+      <div class="app-hero-video__logo">
+        {{ shop.name }}
+      </div>
+      <nav class="app-hero-video__nav">
+        {% if block.settings.menu_1_label != blank and block.settings.menu_1_url != blank %}
+          <a href="{{ block.settings.menu_1_url }}" class="app-hero-video__link">
+            {{ block.settings.menu_1_label }}
+          </a>
+        {% endif %}
+        {% if block.settings.menu_2_label != blank and block.settings.menu_2_url != blank %}
+          <a href="{{ block.settings.menu_2_url }}" class="app-hero-video__link">
+            {{ block.settings.menu_2_label }}
+          </a>
+        {% endif %}
+        {% if block.settings.menu_3_label != blank and block.settings.menu_3_url != blank %}
+          <a href="{{ block.settings.menu_3_url }}" class="app-hero-video__link">
+            {{ block.settings.menu_3_label }}
+          </a>
+        {% endif %}
+      </nav>
+    </header>
+
+    <div class="app-hero-video__content">
+      {% if block.settings.title != blank %}
+        <h1 class="app-hero-video__title">
+          {{ block.settings.title }}
+        </h1>
+      {% endif %}
+      {% if block.settings.subtitle != blank %}
+        <p class="app-hero-video__subtitle">
+          {{ block.settings.subtitle }}
+        </p>
+      {% endif %}
+      {% if block.settings.cta_label != blank and block.settings.cta_url != blank %}
+        <a href="{{ block.settings.cta_url }}" class="app-hero-video__cta">
+          {{ block.settings.cta_label }}
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<style>
+  .app-hero-video {
+    position: relative;
+    width: 100vw;
+    margin-left: calc(-50vw + 50%);
+    overflow: hidden;
+  }
+
+  .app-hero-video__media-wrapper {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none; /* ❌ impossible de cliquer/mettre pause */
+  }
+
+  .app-hero-video__media {
+    width: 100%;
+    height: 100%;
+  }
+
+  .app-hero-video__media iframe,
+  .app-hero-video__video,
+  .app-hero-video__media video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border: none;
+  }
+
+  .app-hero-video__overlay {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    width: 100%;
+    color: {{ block.settings.text_color }};
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-hero-video__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    background: transparent;
+  }
+
+  .app-hero-video__logo {
+    font-weight: 700;
+    font-size: 1.2rem;
+  }
+
+  .app-hero-video__nav {
+    display: flex;
+    gap: 1.5rem;
+  }
+
+  .app-hero-video__link {
+    color: {{ block.settings.text_color }};
+    text-decoration: none;
+    font-size: 0.95rem;
+    opacity: 0.9;
+  }
+
+  .app-hero-video__link:hover {
+    opacity: 1;
+    text-decoration: underline;
+  }
+
+  .app-hero-video__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: {{ block.settings.content_align }};
+    text-align: {{ block.settings.content_align }};
+    padding: 0 32px 40px;
+  }
+
+  .app-hero-video__title {
+    font-size: 2.4rem;
+    margin: 0 0 0.5rem;
+  }
+
+  .app-hero-video__subtitle {
+    margin: 0 0 1.5rem;
+    font-size: 1rem;
+    max-width: 460px;
+  }
+
+  .app-hero-video__cta {
+    display: inline-block;
+    padding: 10px 20px;
+    border-radius: 999px;
+    background-color: {{ block.settings.cta_background }};
+    color: {{ block.settings.cta_text_color }};
+    text-decoration: none;
+    font-size: 0.95rem;
+  }
+
+  .app-hero-video__cta:hover {
+    opacity: 0.9;
+  }
+
+  @media (max-width: 768px) {
+    .app-hero-video__header {
+      padding: 12px 16px;
+    }
+    .app-hero-video__nav {
+      gap: 0.75rem;
+      font-size: 0.85rem;
+    }
+    .app-hero-video__content {
+      align-items: flex-start;
+      text-align: left;
+      padding: 0 16px 32px;
+    }
+    .app-hero-video__title {
+      font-size: 1.8rem;
+    }
+  }
+</style>
+
+{% schema %}
+{
+  "name": "Hero vidéo (app)",
+  "target": "section",
+  "settings": [
+    {
+      "type": "range",
+      "id": "hero_height",
+      "label": "Hauteur du hero (vh)",
+      "min": 40,
+      "max": 100,
+      "step": 5,
+      "default": 80
+    },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "Couleur de fond (fallback)",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Couleur du texte",
+      "default": "#ffffff"
+    },
+
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Titre principal",
+      "default": "Bienvenue sur notre boutique"
+    },
+    {
+      "type": "text",
+      "id": "subtitle",
+      "label": "Sous-titre",
+      "default": "Mettez en avant vos best-sellers ou votre univers de marque avec une vidéo immersive."
+    },
+    {
+      "type": "select",
+      "id": "content_align",
+      "label": "Alignement du contenu",
+      "default": "left",
+      "options": [
+        { "value": "left", "label": "Gauche" },
+        { "value": "center", "label": "Centre" },
+        { "value": "right", "label": "Droite" }
+      ]
+    },
+
+    {
+      "type": "text",
+      "id": "cta_label",
+      "label": "Texte du bouton (CTA)",
+      "default": "Découvrir la collection"
+    },
+    {
+      "type": "url",
+      "id": "cta_url",
+      "label": "Lien du bouton"
+    },
+    {
+      "type": "color",
+      "id": "cta_background",
+      "label": "Couleur du bouton",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "cta_text_color",
+      "label": "Couleur du texte du bouton",
+      "default": "#000000"
+    },
+
+    {
+      "type": "text",
+      "id": "menu_1_label",
+      "label": "Lien menu 1 - texte",
+      "default": "Boutique"
+    },
+    {
+      "type": "url",
+      "id": "menu_1_url",
+      "label": "Lien menu 1 - URL"
+    },
+    {
+      "type": "text",
+      "id": "menu_2_label",
+      "label": "Lien menu 2 - texte",
+      "default": "Nouveautés"
+    },
+    {
+      "type": "url",
+      "id": "menu_2_url",
+      "label": "Lien menu 2 - URL"
+    },
+    {
+      "type": "text",
+      "id": "menu_3_label",
+      "label": "Lien menu 3 - texte",
+      "default": "Contact"
+    },
+    {
+      "type": "url",
+      "id": "menu_3_url",
+      "label": "Lien menu 3 - URL"
+    },
+
+    {
+      "type": "video",
+      "id": "video_file",
+      "label": "Vidéo d'arrière-plan (upload PC via fichiers Shopify)"
+    },
+    {
+      "type": "text",
+      "id": "video_url",
+      "label": "URL YouTube (fallback si aucune vidéo uploadée)",
+      "default": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+    },
+    {
+      "type": "checkbox",
+      "id": "loop",
+      "label": "Boucler la vidéo",
+      "default": true
+    }
+  ]
+}
+{% endschema %}

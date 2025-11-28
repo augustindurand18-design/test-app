@@ -1,0 +1,188 @@
+<div
+  class="bandeau-annonce-wrapper"
+  style="
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+    width: 100vw;
+  "
+>
+  <div
+    class="bandeau-annonce"
+    style="
+      padding: 0 16px;
+      height: {{ block.settings.banner_height }}px;
+      display: flex;
+      align-items: center;
+      background-color: {{ block.settings.background_color }};
+      color: {{ block.settings.text_color }};
+      {% unless block.settings.show_banner %}display:none;{% endunless %}
+      --scroll-duration: {{ block.settings.scroll_speed }}s;
+      --scroll-direction: {% if block.settings.scroll_direction == 'right' %}reverse{% else %}normal{% endif %};
+    "
+  >
+
+    <div class="bandeau-annonce__viewport">
+      {% if block.settings.enable_scroll %}
+        
+        <div class="bandeau-annonce__track bandeau-annonce__track--scroll">
+          {% for i in (1..20) %}
+            <span class="bandeau-annonce__item">
+              {{ block.settings.message }}
+            </span>
+          {% endfor %}
+        </div>
+      {% else %}
+        
+        <div
+          class="
+            bandeau-annonce__track
+            bandeau-annonce__track--static
+            bandeau-annonce__track--static-{{ block.settings.text_align }}
+          "
+        >
+          <span class="bandeau-annonce__item">
+            {{ block.settings.message }}
+          </span>
+        </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<style>
+  .bandeau-annonce__viewport {
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .bandeau-annonce__item {
+    display: inline-block;
+  }
+
+  .bandeau-annonce__track {
+    display: inline-flex;
+    gap: 3rem;
+    white-space: nowrap;
+  }
+
+  /* ✔ Mode statique : alignement avec justify-content sur 100% de la largeur */
+  .bandeau-annonce__track--static {
+    width: 100%;
+  }
+
+  .bandeau-annonce__track--static-left {
+    justify-content: flex-start;
+  }
+
+  .bandeau-annonce__track--static-center {
+    justify-content: center;
+  }
+
+  .bandeau-annonce__track--static-right {
+    justify-content: flex-end;
+  }
+
+  /* ✔ Mode défilement : la track fait exactement la largeur de son contenu */
+  .bandeau-annonce__track--scroll {
+    width: max-content; /* largeur = contenu réel */
+    will-change: transform;
+    animation-name: bandeau-annonce-scroll;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+    animation-duration: var(--scroll-duration, 15s);
+    animation-direction: var(--scroll-direction, normal);
+  }
+
+  /* 🔁 Animation : on décale de la moitié de la piste
+     → comme on répète le même message 2x (ou plus), la boucle est parfaite */
+  @keyframes bandeau-annonce-scroll {
+    0% {
+      transform: translateX(0%);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+</style>
+
+{% schema %}
+{
+  "name": "Bandeau d'annonce",
+  "target": "section",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_banner",
+      "label": "Afficher le bandeau",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "message",
+      "label": "Message",
+      "default": "Livraison gratuite dès 50€"
+    },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "Couleur de fond",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Couleur du texte",
+      "default": "#ffffff"
+    },
+    {
+      "type": "select",
+      "id": "text_align",
+      "label": "Position du texte (statique)",
+      "default": "center",
+      "options": [
+        { "value": "left", "label": "Gauche" },
+        { "value": "center", "label": "Centre" },
+        { "value": "right", "label": "Droite" }
+      ]
+    },
+    {
+      "type": "range",
+      "id": "banner_height",
+      "label": "Hauteur du bandeau (px)",
+      "min": 30,
+      "max": 120,
+      "step": 5,
+      "default": 50
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_scroll",
+      "label": "Activer le défilement du texte",
+      "default": false
+    },
+    {
+      "type": "range",
+      "id": "scroll_speed",
+      "label": "Vitesse de défilement (secondes par cycle)",
+      "min": 5,
+      "max": 40,
+      "step": 1,
+      "default": 15
+    },
+    {
+      "type": "select",
+      "id": "scroll_direction",
+      "label": "Sens de défilement",
+      "default": "left",
+      "options": [
+        { "value": "left", "label": "De droite vers la gauche" },
+        { "value": "right", "label": "De gauche vers la droite" }
+      ]
+    }
+  ]
+}
+{% endschema %}
