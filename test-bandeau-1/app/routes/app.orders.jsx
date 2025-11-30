@@ -1,85 +1,93 @@
-import { useLoaderData, Link } from "react-router";
-import { Page, Card, DataTable, Text } from "@shopify/polaris";
+import { useLoaderData, useNavigate } from "react-router";
+import { Page, Card, DataTable, Text, Button } from "@shopify/polaris";
+import { authenticate } from "../shopify.server";
 
-// ⚠️ VERSION TRAINING SANS API SHOPIFY
-export const loader = async () => {
-  // On simule 3 commandes
-  const orders = [
-    {
-      id: "1001",
-      name: "#1001",
-      processedAt: new Date().toISOString(),
-      totalPriceSet: {
-        shopMoney: { amount: "59.90", currencyCode: "EUR" },
-      },
-      customer: {
-        displayName: "Jean Test",
-        email: "jean.test@example.com",
-      },
-    },
-    {
-      id: "1002",
-      name: "#1002",
-      processedAt: new Date().toISOString(),
-      totalPriceSet: {
-        shopMoney: { amount: "19.90", currencyCode: "EUR" },
-      },
-      customer: {
-        displayName: "Marie Exemple",
-        email: "marie@example.com",
-      },
-    },
-    {
-      id: "1003",
-      name: "#1003",
-      processedAt: new Date().toISOString(),
-      totalPriceSet: {
-        shopMoney: { amount: "120.00", currencyCode: "EUR" },
-      },
-      customer: null,
-    },
-  ];
+export const loader = async ({ request }) => {
+  // 1. On récupère la session complète
+  const { admin, session } = await authenticate.admin(request);
 
-  return { orders };
+  const response = await admin.graphql(
+    `#graphql
+      query getOrders {
+        orders(first: 10, sortKey: PROCESSED_AT, reverse: true) {
+          edges {
+            node {
+              id
+              name
+              processedAt
+              totalPriceSet {
+                shopMoney {
+                  amount
+                  currencyCode
+                }
+              }
+              customer {
+                displayName
+                email
+              }
+            }
+          }
+        }
+      }`
+  );
+
+  const data = await response.json();
+
+  const orders = data.data.orders.edges.map((edge) => {
+    const node = edge.node;
+    return {
+      ...node,
+      simpleId: node.id.split("/").pop(),
+    };
+  });
+
+  // 2. IMPORTANT : On renvoie le shop explicitement
+  return { 
+    orders, 
+    shop: session.shop 
+  };
 };
 
 export default function OrdersIndex() {
-  const { orders } = useLoaderData();
+  const { orders, shop } = useLoaderData();
+  const navigate = useNavigate();
+
+  // Affiche le shop dans la console de ton navigateur (F12) pour vérifier
+  console.log("Nom de la boutique détecté :", shop);
 
   const rows = orders.map((order) => {
     const money = order.totalPriceSet.shopMoney;
-    const orderId = order.id; // déjà simple
+    
+    // 3. Construction de l'URL sécurisée
+    // Si 'shop' est vide, le lien ne marchera pas dans un nouvel onglet
+    const pdfUrl = `/app/orders/${order.simpleId}/pdf?shop=${shop}`;
 
     return [
       order.name,
       order.customer?.displayName || "—",
       new Date(order.processedAt).toLocaleString("fr-FR"),
       `${money.amount} ${money.currencyCode}`,
-      <Link to={`/app/orders/${orderId}`}>Voir facture</Link>,
+      <Button 
+        url={pdfUrl} 
+        target="_blank" 
+        variant="plain"
+      >
+        Voir PDF
+      </Button>,
     ];
   });
 
   return (
-    <Page title="Factures commandes (MVP)">
+    <Page title="Mes Commandes">
       <Card>
         {orders.length === 0 ? (
-          <Text as="p">Aucune commande pour l’instant.</Text>
+          <div style={{ padding: "20px" }}>
+            <Text as="p">Aucune commande.</Text>
+          </div>
         ) : (
           <DataTable
-            columnContentTypes={[
-              "text",
-              "text",
-              "text",
-              "numeric",
-              "text",
-            ]}
-            headings={[
-              "Commande",
-              "Client",
-              "Date",
-              "Total",
-              "Facture",
-            ]}
+            columnContentTypes={["text", "text", "text", "numeric", "text"]}
+            headings={["Commande", "Client", "Date", "Total", "Action"]}
             rows={rows}
           />
         )}
