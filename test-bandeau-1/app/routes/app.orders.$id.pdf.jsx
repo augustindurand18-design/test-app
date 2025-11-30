@@ -90,6 +90,8 @@ export const loader = async ({ params, request }) => {
   return new Response(stream, {
     headers: {
       "Content-Type": "application/pdf",
+      // AJOUT IMPORTANT : inline permet l'affichage dans l'iframe
+      "Content-Disposition": `inline; filename="Facture-${order.name}.pdf"`,
     },
   });
 };
