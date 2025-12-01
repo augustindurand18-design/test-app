@@ -40,10 +40,32 @@ model BannerConfig {
 }
 
 model Settings {
-  id          Int     @id @default(autoincrement())
-  shop        String  @unique
-  brandColor  String  @default("#000000")
-  companyName String?
-  address     String?
-  logoUrl     String?
+  id             Int     @id @default(autoincrement())
+  shop           String  @unique
+  companyName    String?
+  address        String?
+  logoUrl        String?
+  
+  brandColor     String  @default("#000000")
+  secondaryColor String  @default("#555555")
+  titleColor     String  @default("#000000")
+  
+  layout         String  @default("classic")
+  logoSize       Int     @default(50)
+  fontSize       Int     @default(10)
+  signatureUrl   String?
+  showWatermark  Boolean @default(true)
+  font           String  @default("Helvetica")
+
+  // --- NOUVEAUX CHAMPS SÉPARÉS ---
+  siret          String?  // Numéro SIRET
+  tvaIntra       String?  // Numéro TVA
+  legalInfo      String?  // Autres mentions (ex: SARL au capital de...)
+  // NOUVEAUX CHAMPS EMAIL
+  smtpEmail      String?
+  smtpPassword   String? // Le mot de passe d'application
+  // NOUVEAU CHAMP
+  language       String  @default("fr") // "fr", "en", "es", "de", "it"
+  // NOUVEAU : Langue de l'interface
+  uiLanguage     String  @default("fr")
 }

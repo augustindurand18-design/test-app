@@ -1,12 +1,10 @@
 import { authenticate } from "../shopify.server";
-import { useLoaderData, Link } from "react-router";
-import { Page, Card, Button, Text } from "@shopify/polaris";
-import { Page as PdfPage, Text as PdfText, View, Document, StyleSheet, PDFViewer, Image, Font } from "@react-pdf/renderer";
-import React, { useState, useEffect } from "react";
-import db from "../db.server"; 
+import db from "../db.server";
+import { Page as PdfPage, Text as PdfText, View, Document, StyleSheet, renderToStream, Image, Font } from "@react-pdf/renderer";
+import nodemailer from "nodemailer";
 import { translations } from "../i18n"; 
 
-// Polices
+// 1. POLICES
 Font.register({ family: 'Roboto', src: 'https://fonts.gstatic.com/s/roboto/v27/KFOmCnqEu92Fr1Mu4mxK.ttf' });
 Font.register({ family: 'Open Sans', src: 'https://fonts.gstatic.com/s/opensans/v17/mem8YaGs126MiZpBA-UFVZ0e.ttf' });
 Font.register({ family: 'Lato', src: 'https://fonts.gstatic.com/s/lato/v16/S6uyw4BMUTPHjx4wXg.ttf' });
@@ -17,42 +15,10 @@ Font.register({ family: 'Merriweather', src: 'https://fonts.gstatic.com/s/merriw
 Font.register({ family: 'Raleway', src: 'https://fonts.gstatic.com/s/raleway/v18/1Ptxg8zYS_SKggPN4iEgvnHyvveLxVvaorCIPrQ.ttf' });
 Font.register({ family: 'Inconsolata', src: 'https://fonts.gstatic.com/s/inconsolata/v20/QldKNThLqRwH-OJ1UHjlKGlZ5qg.ttf' });
 
-export const loader = async ({ request, params }) => {
-  const { session, admin } = await authenticate.admin(request);
-  
-  let settings = null;
-  try {
-    if (db.settings) settings = await db.settings.findUnique({ where: { shop: session.shop } });
-  } catch (e) {}
-
-  const response = await admin.graphql(
-    `#graphql
-    query getOrderForPdf($id: ID!) {
-      order(id: $id) {
-        name, processedAt, displayFinancialStatus, 
-        customer { displayName email },
-        lineItems(first: 20) { edges { node { id name quantity originalUnitPriceSet { shopMoney { amount currencyCode } } } } },
-        totalPriceSet { shopMoney { amount currencyCode } }
-      }
-    }`,
-    { variables: { id: `gid://shopify/Order/${params.id}` } }
-  );
-  
-  const data = await response.json();
-  const safeSettings = settings || { 
-      brandColor: "#000000", secondaryColor: "#555555", titleColor: "#000000", 
-      layout: "classic", logoSize: 50, fontSize: 10, font: "Helvetica", showWatermark: true,
-      siret: "", tvaIntra: "", legalInfo: "", language: "fr"
-  };
-
-  return { order: data.data.order, shop: session.shop, settings: safeSettings };
-};
-
+// 2. DOCUMENT PDF
 const InvoiceDocument = ({ order, settings }) => {
   const lang = settings.language || "fr";
-  
-  // --- CORRECTION MAJEURE ICI ---
-  // On cible directement la partie '.doc' du dictionnaire
+  // On récupère la partie "doc" du dictionnaire
   const t = translations[lang]?.doc || translations["fr"].doc;
 
   const primary = settings.brandColor || "#000000";
@@ -79,33 +45,7 @@ const InvoiceDocument = ({ order, settings }) => {
 
   const styles = StyleSheet.create({
     page: { padding: 40, fontSize: baseSize, fontFamily: font },
-    
-    // --- TAMPON ---
-    watermarkWrapper: {
-        position: 'absolute',
-        top: 0, left: 0, right: 0, bottom: 0,
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: -1
-    },
-    watermarkContainer: {
-        transform: 'rotate(-45deg)',
-        borderWidth: 5,
-        borderColor: '#d32f2f',
-        borderRadius: 12,
-        padding: '10 30',
-        opacity: 0.25,
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    watermarkText: {
-        fontSize: 60,
-        fontWeight: '900', // Très gras
-        color: '#d32f2f',
-        textTransform: 'uppercase'
-    },
-    // --------------
-
+    watermark: { position: 'absolute', top: 200, left: 100, right: 0, bottom: 0, transform: 'rotate(-45deg)', opacity: 0.15, fontSize: 120, fontWeight: 'bold', color: 'red', zIndex: -1 },
     header: { flexDirection: headerDirection, alignItems: headerAlign, justifyContent: 'space-between', marginBottom: 40 },
     headerInfoBlock: { flexDirection: 'column', alignItems: headerAlign, width: settings.layout === 'centered' ? '100%' : '55%' },
     headerInvoiceBlock: { flexDirection: 'column', alignItems: (settings.layout === 'mirrored' ? 'flex-start' : (settings.layout === 'centered' ? 'center' : 'flex-end')) },
@@ -128,16 +68,7 @@ const InvoiceDocument = ({ order, settings }) => {
   return (
     <Document>
       <PdfPage size="A4" style={styles.page}>
-        
-        {/* TAMPON CORRIGÉ */}
-        {showWatermark && (
-            <View style={styles.watermarkWrapper} fixed>
-                <View style={styles.watermarkContainer}>
-                    <PdfText style={styles.watermarkText}>{t.paid}</PdfText>
-                </View>
-            </View>
-        )}
-
+        {showWatermark && <View style={styles.watermark}><PdfText>{t.paid}</PdfText></View>}
         <View style={styles.header}>
             <View style={styles.headerInfoBlock}>
                 {settings.logoUrl ? <Image src={settings.logoUrl} style={styles.logo} /> : null}
@@ -150,13 +81,11 @@ const InvoiceDocument = ({ order, settings }) => {
                 <PdfText style={{fontSize: baseSize, color: secondary, marginTop: 5}}>{t.statut} : {order.displayFinancialStatus}</PdfText>
             </View>
         </View>
-
         <View style={{marginBottom: 30}}>
             <PdfText style={{fontSize: baseSize, color: secondary, marginBottom: 4}}>{t.billedTo} :</PdfText>
             <PdfText>{order.customer?.displayName}</PdfText>
             <PdfText style={{color: secondary}}>{order.customer?.email}</PdfText>
         </View>
-
         <View>
           <View style={styles.tableHeader}>
               <PdfText style={styles.colProd}>{t.description}</PdfText>
@@ -171,16 +100,13 @@ const InvoiceDocument = ({ order, settings }) => {
             </View>
           ))}
         </View>
-
         <PdfText style={styles.totalText}>{t.total}: {order.totalPriceSet.shopMoney.amount} {order.totalPriceSet.shopMoney.currencyCode}</PdfText>
-
         {settings.signatureUrl && (
             <View style={styles.signatureBlock}>
                 <PdfText style={{fontSize: baseSize, marginBottom: 5, color: secondary}}>{t.signature} :</PdfText>
                 <Image src={settings.signatureUrl} style={styles.signatureImg} />
             </View>
         )}
-
         <View style={styles.footer}>
             <View style={styles.footerRow}>
                 {settings.siret && <PdfText>SIRET: {settings.siret}  </PdfText>}
@@ -188,35 +114,76 @@ const InvoiceDocument = ({ order, settings }) => {
             </View>
             {settings.legalInfo && <PdfText>{settings.legalInfo}</PdfText>}
         </View>
-
       </PdfPage>
     </Document>
   );
 };
 
-export default function PrintPage() {
-  const { order, shop, settings } = useLoaderData();
-  const [isClient, setIsClient] = useState(false);
-  useEffect(() => { setIsClient(true); }, []);
+// 3. ACTION
+export const action = async ({ request }) => {
+  const { session, admin } = await authenticate.admin(request);
+  const formData = await request.formData();
+  const orderId = formData.get("orderId");
+  const customerEmail = formData.get("email");
 
-  return (
-    <Page title={`Impression : ${order.name}`}>
-      <div style={{ marginBottom: "20px" }}>
-        <Link to={`/app/orders?shop=${shop}`} style={{textDecoration: 'none'}}>
-           <Button>Retour à la liste</Button>
-        </Link>
-      </div>
-      <Card>
-        <div style={{ height: "80vh", width: "100%" }}>
-          {isClient ? (
-            <PDFViewer width="100%" height="100%" showToolbar={true}>
-              <InvoiceDocument order={order} settings={settings} />
-            </PDFViewer>
-          ) : (
-            <div style={{ padding: "50px", textAlign: "center" }}><Text>Chargement...</Text></div>
-          )}
-        </div>
-      </Card>
-    </Page>
+  if (!customerEmail) return { status: "error", message: "Aucun email client !" };
+
+  let settings = null;
+  try { if (db.settings) settings = await db.settings.findUnique({ where: { shop: session.shop } }); } catch (e) {}
+  
+  if (!settings?.smtpEmail || !settings?.smtpPassword) {
+      return { status: "error", message: "Veuillez configurer votre Email Gmail dans l'onglet Personnalisation !" };
+  }
+
+  // --- CORRECTION TRADUCTION EMAIL ---
+  const lang = settings.language || "fr";
+  // On récupère la partie "doc" du dictionnaire
+  const t = translations[lang]?.doc || translations["fr"].doc;
+
+  const safeSettings = settings || { brandColor: "#000000", secondaryColor: "#555555", titleColor: "#000000", layout: "classic", logoSize: 50, fontSize: 10, font: "Helvetica", showWatermark: true, siret: "", tvaIntra: "", legalInfo: "", language: "fr" };
+
+  const response = await admin.graphql(
+    `#graphql
+    query getOrderForPdf($id: ID!) {
+      order(id: $id) { name, processedAt, displayFinancialStatus, customer { displayName email }, lineItems(first: 20) { edges { node { id name quantity originalUnitPriceSet { shopMoney { amount currencyCode } } } } }, totalPriceSet { shopMoney { amount currencyCode } } } }`,
+    { variables: { id: `gid://shopify/Order/${orderId}` } }
   );
-}
+  const data = await response.json();
+  const order = data.data.order;
+
+  const stream = await renderToStream(<InvoiceDocument order={order} settings={safeSettings} />);
+  const chunks = [];
+  for await (const chunk of stream) chunks.push(chunk);
+  const pdfBuffer = Buffer.concat(chunks);
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: settings.smtpEmail, 
+        pass: settings.smtpPassword 
+    }
+  });
+
+  try {
+    await transporter.sendMail({
+        from: `"${settings.companyName || "Boutique"}" <${settings.smtpEmail}>`,
+        to: customerEmail, 
+        // CORRECTION : On utilise les variables traduites (t.emailSubject, t.emailBody)
+        subject: `${t.emailSubject} ${order.name}`,
+        text: `${t.emailHello} ${order.customer?.displayName || ""},\n\n${t.emailBody}\n\n${t.emailKind},\n${settings.companyName || "L'équipe"}`,
+        attachments: [
+            {
+                filename: `Facture-${order.name}.pdf`,
+                content: pdfBuffer,
+                contentType: 'application/pdf'
+            }
+        ]
+    });
+
+    return { status: "success", message: "Email envoyé !" };
+
+  } catch (error) {
+    console.error("❌ Erreur lors de l'envoi :", error);
+    return { status: "error", message: "Erreur d'envoi" };
+  }
+};

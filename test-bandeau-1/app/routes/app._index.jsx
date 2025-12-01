@@ -1,138 +1,133 @@
-import { boundary } from "@shopify/shopify-app-react-router/server";
+import { useLoaderData, useSubmit, useActionData } from "react-router";
+import { Page, Layout, Card, TextField, Button, Text, BlockStack, Banner, List, Link, Select } from "@shopify/polaris";
+import { useState, useEffect } from "react";
 import { authenticate } from "../shopify.server";
-import { useEffect, useState } from "react";
+import db from "../db.server";
+import { translations } from "../i18n"; // Import Trad
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request); // Vérifie qu'on est admin
-  return null;
+  const { session } = await authenticate.admin(request);
+  let settings = null;
+  try { if (db.settings) settings = await db.settings.findUnique({ where: { shop: session.shop } }); } catch (e) {}
+
+  return { 
+    smtpEmail: settings?.smtpEmail || "", 
+    smtpPassword: settings?.smtpPassword || "",
+    uiLanguage: settings?.uiLanguage || "fr"
+  };
 };
 
-export const ErrorBoundary = boundary;
+export const action = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+  const formData = await request.formData();
+
+  try {
+    await db.settings.upsert({
+      where: { shop: session.shop },
+      update: { 
+        smtpEmail: formData.get("smtpEmail"), 
+        smtpPassword: formData.get("smtpPassword"),
+        uiLanguage: formData.get("uiLanguage") 
+      },
+      create: { 
+        shop: session.shop, 
+        smtpEmail: formData.get("smtpEmail"), 
+        smtpPassword: formData.get("smtpPassword"),
+        uiLanguage: formData.get("uiLanguage"),
+      },
+    });
+    return { status: "success" };
+  } catch (error) {
+    return { status: "error" };
+  }
+};
 
 export default function Index() {
-  const [message, setMessage] = useState("");
-  const [backgroundColor, setBackgroundColor] = useState("#000000");
-  const [textColor, setTextColor] = useState("#ffffff");
-  const [isEnabled, setIsEnabled] = useState(true);
-  const [textAlign, setTextAlign] = useState("center");
+  const { smtpEmail, smtpPassword, uiLanguage } = useLoaderData();
+  const actionData = useActionData();
+  const submit = useSubmit();
 
-  // Charger config
-  useEffect(() => {
-    const fetchConfig = async () => {
-      try {
-        const res = await fetch("/api/bandeau-message");
-        if (!res.ok) return;
+  const [formState, setFormState] = useState({ smtpEmail, smtpPassword, uiLanguage });
+  const [bannerVisible, setBannerVisible] = useState(false);
 
-        const data = await res.json();
+  // CHARGEMENT DICTIONNAIRE
+  const currentLang = formState.uiLanguage || "fr";
+  const txt = translations[currentLang]?.ui || translations["fr"].ui;
 
-        if (data.message !== undefined) setMessage(data.message);
-        if (data.backgroundColor) setBackgroundColor(data.backgroundColor);
-        if (data.textColor) setTextColor(data.textColor);
-        if (typeof data.isEnabled === "boolean") setIsEnabled(data.isEnabled);
-        if (data.textAlign) setTextAlign(data.textAlign);
-      } catch (err) {
-        console.error("Erreur de chargement :", err);
-      }
-    };
+  useEffect(() => { setFormState({ smtpEmail, smtpPassword, uiLanguage }); }, [smtpEmail, smtpPassword, uiLanguage]);
+  useEffect(() => { if (actionData?.status === "success") setBannerVisible(true); }, [actionData]);
 
-    fetchConfig();
-  }, []);
-
-  // Sauvegarder config
-  const handleSave = async () => {
-    try {
-      const response = await fetch("/api/bandeau-message", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message,
-          backgroundColor,
-          textColor,
-          isEnabled,
-          textAlign,
-        }),
-      });
-
-      if (!response.ok) throw new Error("Erreur HTTP");
-
-      alert("Configuration enregistrée ✔️");
-    } catch (err) {
-      console.error(err);
-      alert("Erreur ❌");
-    }
+  const handleChange = (val, id) => setFormState({ ...formState, [id]: val });
+  const handleSave = () => {
+    const formData = new FormData();
+    formData.append("smtpEmail", formState.smtpEmail);
+    formData.append("smtpPassword", formState.smtpPassword);
+    formData.append("uiLanguage", formState.uiLanguage);
+    submit(formData, { method: "post" });
   };
 
   return (
-    <div style={{ padding: "16px", fontFamily: "system-ui" }}>
-      <h1 style={{ marginBottom: "12px" }}>Configuration du bandeau</h1>
+    <Page title={txt.titles.dashboard}>
+      <Layout>
+        <Layout.Section>
+            {bannerVisible && (
+                <div style={{marginBottom: "20px"}}>
+                    <Banner title={txt.text.saveSuccess} tone="success" onDismiss={() => setBannerVisible(false)} />
+                </div>
+            )}
 
-      {/* Message */}
-      <label>Message :</label>
-      <input
-        type="text"
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        style={{ width: "100%", marginBottom: "12px" }}
-      />
+            <Card>
+                <BlockStack gap="400">
+                    <Text variant="headingMd" as="h2">{txt.titles.welcome}</Text>
+                    <p>{txt.text.welcomeSub}</p>
+                    <Select
+                        label={txt.labels.uiLang}
+                        options={[{label: 'Français 🇫🇷', value: 'fr'}, {label: 'English 🇺🇸', value: 'en'}]}
+                        onChange={(v) => handleChange(v, 'uiLanguage')}
+                        value={formState.uiLanguage}
+                    />
+                </BlockStack>
+            </Card>
+        </Layout.Section>
 
-      {/* Couleurs */}
-      <label>Couleur de fond :</label>
-      <input
-        type="color"
-        value={backgroundColor}
-        onChange={(e) => setBackgroundColor(e.target.value)}
-        style={{ marginBottom: "12px" }}
-      />
+        <Layout.Section>
+          <Card>
+            <BlockStack gap="500">
+              <Text variant="headingMd" as="h2">{txt.titles.smtp}</Text>
+              <Text as="p" tone="subdued">{txt.text.smtpSub}</Text>
 
-      <label>Couleur du texte :</label>
-      <input
-        type="color"
-        value={textColor}
-        onChange={(e) => setTextColor(e.target.value)}
-        style={{ marginBottom: "12px" }}
-      />
+              <TextField 
+                  label={txt.labels.gmailAddr} 
+                  value={formState.smtpEmail} 
+                  onChange={(v) => handleChange(v, 'smtpEmail')} 
+                  autoComplete="email"
+              />
+              <TextField 
+                  label={txt.labels.gmailPass} 
+                  value={formState.smtpPassword} 
+                  onChange={(v) => handleChange(v, 'smtpPassword')} 
+                  type="password" 
+                  autoComplete="off"
+              />
+              <div style={{textAlign: "right"}}>
+                <Button variant="primary" onClick={handleSave}>{txt.labels.saveConfig}</Button>
+              </div>
+            </BlockStack>
+          </Card>
+        </Layout.Section>
 
-      {/* Position du texte */}
-      <label>Position du texte :</label>
-      <select
-        value={textAlign}
-        onChange={(e) => setTextAlign(e.target.value)}
-        style={{ width: "100%", padding: "6px", marginBottom: "12px" }}
-      >
-        <option value="left">Gauche</option>
-        <option value="center">Centre</option>
-        <option value="right">Droite</option>
-      </select>
-
-      {/* Toggle bandeau */}
-      <label style={{ display: "block", marginBottom: "12px" }}>
-        <input
-          type="checkbox"
-          checked={isEnabled}
-          onChange={(e) => setIsEnabled(e.target.checked)}
-        />
-        Afficher le bandeau
-      </label>
-
-      {/* Aperçu */}
-      <div
-        style={{
-          padding: "10px",
-          backgroundColor,
-          color: textColor,
-          opacity: isEnabled ? 1 : 0.4,
-          textAlign,
-        }}
-      >
-        {message || "(Aucun message)"}
-      </div>
-
-      <button
-        onClick={handleSave}
-        style={{ marginTop: "16px", padding: "8px 16px", cursor: "pointer" }}
-      >
-        Enregistrer
-      </button>
-    </div>
+        <Layout.Section variant="oneThird">
+            <Card>
+                <BlockStack gap="200">
+                    <Text variant="headingSm" as="h3">{txt.titles.nextSteps}</Text>
+                    <List type="number">
+                        <List.Item>{txt.text.step1}</List.Item>
+                        <List.Item>{txt.text.step2}</List.Item>
+                    </List>
+                </BlockStack>
+            </Card>
+        </Layout.Section>
+      </Layout>
+    </Page>
   );
 }
